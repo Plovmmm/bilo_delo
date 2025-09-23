@@ -1,0 +1,335 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f5;
+}
+
+#map {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Временная метка */
+.temp-marker {
+    position: absolute;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.marker-point {
+    width: 20px;
+    height: 20px;
+    background: #ff4444;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.marker-btn {
+    pointer-events: all;
+    margin-left: 25px;
+    padding: 10px 16px;
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+.marker-btn:hover {
+    background: #cc3333;
+    transform: translateY(-1px);
+}
+
+/* Панель добавления */
+.panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    z-index: 2000;
+    max-width: 500px;
+    width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+    border-radius: 12px 12px 0 0;
+}
+
+.panel-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 5px;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-close:hover {
+    background: #e9ecef;
+    color: #333;
+}
+
+.form {
+    padding: 20px;
+}
+
+.form-section {
+    margin-bottom: 25px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+/* Загрузка фото */
+.photo-upload {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.photo-main {
+    flex: 1;
+    min-width: 150px;
+}
+
+.photo-additional {
+    display: flex;
+    gap: 10px;
+    flex: 2;
+}
+
+.photo-upload-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #fafafa;
+    min-height: 120px;
+    position: relative;
+}
+
+.photo-upload-area.small {
+    min-height: 80px;
+    padding: 15px;
+    flex: 1;
+}
+
+.photo-upload-area:hover {
+    border-color: #007bff;
+    background: #f0f8ff;
+}
+
+.photo-upload-area.dragover {
+    border-color: #007bff;
+    background: #e3f2fd;
+    transform: scale(1.02);
+}
+
+.photo-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+}
+
+.photo-text {
+    font-size: 12px;
+    text-align: center;
+    color: #666;
+}
+
+.photo-upload-area img {
+    max-width: 100%;
+    max-height: 100px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+/* Форма */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.form-group small {
+    color: #666;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    min-width: 100px;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.btn-cancel {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-cancel:hover {
+    background: #545b62;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Стили для балуна */
+.balloon-content {
+    max-width: 250px;
+}
+
+.place-photos {
+    margin: 10px 0;
+}
+
+.place-photos img {
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.place-photos img:hover {
+    transform: scale(1.1);
+}
+
+.balloon-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.balloon-btn:hover {
+    background: #0056b3;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .photo-upload {
+        flex-direction: column;
+    }
+    
+    .photo-additional {
+        flex-wrap: wrap;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .panel {
+        width: 95vw;
+        margin: 0;
+    }
+    
+    .marker-btn {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .photo-upload-area {
+        min-height: 100px;
+        padding: 15px;
+    }
+    
+    .photo-upload-area.small {
+        min-height: 70px;
+        padding: 10px;
+    }
+}
