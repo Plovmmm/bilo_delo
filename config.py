@@ -3,7 +3,7 @@ import os
 class Config:
     # Telegram Bot API
     BOT_TOKEN = "8441513229:AAGc7tuq_6f8lh5Rxfg1aAZ50H48yGJ8Ql4"
-    ADMIN_ID = "ваш_telegram_id"  # Заменим когда скажете ваш ID
+    ADMIN_ID = "1323961884"  # Ваш реальный Telegram ID
     
     # Яндекс.Карты API
     YANDEX_MAPS_API_KEY = "e3ae341e-a8e0-4284-8d2f-cc20984dc27e"
