@@ -5,21 +5,13 @@ from datetime import datetime
 from config import Config
 
 app = Flask(__name__)
-app.config.from_object(Config)
+app.config['SECRET_KEY'] = Config.SECRET_KEY
 
 def init_db():
     """Инициализация базы данных"""
     conn = sqlite3.connect(Config.DATABASE_URL)
     c = conn.cursor()
     
-    # Таблица пользователей (для будущего расширения)
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  telegram_id TEXT UNIQUE NOT NULL,
-                  username TEXT,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
-    # Таблица мест (основная)
     c.execute('''CREATE TABLE IF NOT EXISTS places
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id TEXT NOT NULL,
@@ -33,22 +25,18 @@ def init_db():
                   photos TEXT DEFAULT '[]',
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Добавляем админа если его нет
-    try:
-        c.execute("INSERT OR IGNORE INTO users (telegram_id) VALUES (?)", (Config.ADMIN_ID,))
-        conn.commit()
-    except:
-        pass
-    
+    conn.commit()
     conn.close()
 
 @app.route('/')
 def index():
     """Главная страница для админа"""
+    today = datetime.now().date().isoformat()
     return render_template('index.html', 
                          yandex_maps_key=Config.YANDEX_MAPS_API_KEY,
                          user_id=Config.ADMIN_ID,
-                         is_admin=True)
+                         is_admin=True,
+                         today=today)
 
 @app.route('/guest/<user_id>')
 def guest_map(user_id):
@@ -69,7 +57,6 @@ def get_places():
     places = c.fetchall()
     conn.close()
     
-    # Преобразуем в JSON формат
     result = []
     for place in places:
         result.append({
@@ -91,6 +78,11 @@ def add_place():
     """Добавить новую метку"""
     try:
         data = request.json
+        
+        # Валидация данных
+        if not data.get('title') or not data.get('lat') or not data.get('lon'):
+            return jsonify({'success': False, 'error': 'Не заполнены обязательные поля'})
+        
         conn = sqlite3.connect(Config.DATABASE_URL)
         c = conn.cursor()
         
