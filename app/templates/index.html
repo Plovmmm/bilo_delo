@@ -22,6 +22,12 @@
         </button>
     </div>
     
+    <!-- Временная метка с кнопкой -->
+    <div id="tempMarker" class="temp-marker hidden">
+        <div class="marker-point"></div>
+        <button class="marker-btn" onclick="openAddPanel()">➕ Добавить место</button>
+    </div>
+
     <div id="addPlacePanel" class="panel hidden">
         <h3>Добавить новое место</h3>
         <div class="form-group">
@@ -43,10 +49,10 @@
     <script>
         const USER_ID = "{{ user_id }}";
         const IS_ADMIN = {{ is_admin|tojson }};
-        let map, addPlaceListener, selectedCoords;
+        let map, addPlaceListener, selectedCoords, tempMarker;
         
         ymaps.ready(initMap);
-        
+
         function initMap() {
             map = new ymaps.Map("map", {
                 center: [55.76, 37.64],
@@ -77,7 +83,13 @@
                         <p><strong>Дата:</strong> ${place.date_visited}</p>
                         ${place.description ? `<p><strong>Описание:</strong> ${place.description}</p>` : ''}
                         ${place.address ? `<p><strong>Адрес:</strong> ${place.address}</p>` : ''}
-                        ${IS_ADMIN ? `<button onclick="editPlace(${place.id})">✏️ Редактировать</button>` : ''}
+                        ${place.photos && place.photos.length > 0 ? 
+                            `<div class="place-photos">
+                                ${place.photos.map(photo => 
+                                    `<img src="${photo.url}" alt="${place.title}" style="max-width: 100px; margin: 5px;">`
+                                ).join('')}
+                            </div>` : ''}
+                        ${IS_ADMIN ? `<button onclick="editPlace(${place.id})" class="balloon-btn">✏️ Редактировать</button>` : ''}
                     </div>
                 `
             }, {
@@ -90,6 +102,43 @@
         {% if is_admin %}
         function setupAdminFeatures() {
             // Настройка функций для админа
+            // Обработчик клика по карте - показывает временную метку
+            map.events.add('click', function(e) {
+                if (addPlaceListener) {
+                    showTempMarker(e.get('coords'));
+                }
+            });
+        }
+
+        // Функция показа временной метки при клике на карте
+        function showTempMarker(coords) {
+            selectedCoords = coords;  // Сохраняем выбранные координаты
+        
+            // Удаляем предыдущую временную метку если есть
+            if (tempMarker) {
+                map.geoObjects.remove(tempMarker);
+            }
+        
+            // Создаем красную метку на карте
+            tempMarker = new ymaps.Placemark(coords, {}, {
+                preset: 'islands#redIcon',
+                draggable: true  // Можно перемещать метку
+            });
+        
+            map.geoObjects.add(tempMarker);
+        
+            // Определяем адрес по координатам
+            getAddress(coords);
+        
+            // Обработчик перемещения метки
+            tempMarker.events.add('dragend', function() {
+                const newCoords = tempMarker.geometry.getCoordinates();
+                selectedCoords = newCoords;
+                getAddress(newCoords);
+            });
+            
+            // Показываем панель добавления места
+            document.getElementById('addPlacePanel').classList.remove('hidden');
         }
         
         function toggleAddMode() {
@@ -102,22 +151,20 @@
         
         function enableAddMode() {
             document.querySelector('.controls .btn-primary').classList.add('active');
-            document.getElementById('addPlacePanel').classList.remove('hidden');
-            
-            addPlaceListener = map.events.add('click', function (e) {
-                selectedCoords = e.get('coords');
-                getAddress(selectedCoords);
-            });
+            addPlaceListener = true; // Устанавливаем флаг, что режим добавления активен
         }
         
         function disableAddMode() {
             document.querySelector('.controls .btn-primary').classList.remove('active');
             document.getElementById('addPlacePanel').classList.add('hidden');
             
-            if (addPlaceListener) {
-                map.events.remove(addPlaceListener);
-                addPlaceListener = null;
+            // Удаляем временную метку
+            if (tempMarker) {
+                map.geoObjects.remove(tempMarker);
+                tempMarker = null;
             }
+            
+            addPlaceListener = null;
         }
         
         function getAddress(coords) {
@@ -125,7 +172,8 @@
             ymaps.geocode(coords).then(function (res) {
                 const firstGeoObject = res.geoObjects.get(0);
                 const address = firstGeoObject ? firstGeoObject.getAddressLine() : 'Адрес не определен';
-                document.getElementById('placeAddress').value = address;
+                // Сохраняем адрес для использования при сохранении
+                selectedAddress = address;
             });
         }
         
@@ -142,7 +190,8 @@
                 description: document.getElementById('placeDescription').value,
                 date_visited: document.getElementById('placeDate').value,
                 lat: selectedCoords[0],
-                lon: selectedCoords[1]
+                lon: selectedCoords[1],
+                address: selectedAddress || ''
             };
             
             fetch('/api/places', {
@@ -178,6 +227,9 @@
                 });
             }
         }
+        
+        // Добавляем переменную для хранения адреса
+        let selectedAddress = '';
         {% endif %}
     </script>
 </body>
