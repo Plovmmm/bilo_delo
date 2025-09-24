@@ -4,23 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🗺️ Было дело - Моя карта</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://api-maps.yandex.ru/2.1/?apikey=e3ae341e-a8e0-4284-8d2f-cc20984dc27e&lang=ru_RU" type="text/javascript"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div id="map"></div>
     
-    {% if is_admin %}
-    <div class="controls">
-        <button class="btn btn-primary" onclick="toggleAddMode()">
-            <span class="btn-icon">➕</span>
-            <span class="btn-text">Добавить место</span>
-        </button>
-        <button class="btn btn-secondary" onclick="shareMap()">
-            <span class="btn-icon">🔗</span>
-            <span class="btn-text">Поделиться</span>
-        </button>
     {% if is_admin %}
     <div class="controls">
         <button class="btn btn-primary" onclick="toggleAddMode()">
@@ -42,14 +31,6 @@
                     <div class="photo-preview" id="mainPhotoPreview">
                         <span class="photo-placeholder">📷</span>
                         <div class="photo-label">Загрузите главное фото</div>
-        <h3>Добавить новое место</h3>
-        
-        <div class="photo-upload-section">
-            <div class="photo-column">
-                <div class="photo-upload-main">
-                    <div class="photo-preview" id="mainPhotoPreview">
-                        <span class="photo-placeholder">📷</span>
-                        <div class="photo-label">Загрузите главное фото</div>
                     </div>
                     <input type="file" id="mainPhotoInput" accept="image/*" class="photo-input" 
                            onchange="handleMainPhotoUpload(event)">
@@ -60,19 +41,7 @@
                     <div class="photo-preview secondary" id="secondaryPhotoPreview">
                         <span class="photo-placeholder">➕</span>
                         <div class="photo-label secondary">Добавьте до 3 дополнительных фото</div>
-                    <input type="file" id="mainPhotoInput" accept="image/*" class="photo-input" 
-                           onchange="handleMainPhotoUpload(event)">
-                    <button type="button" class="btn-remove-photo" onclick="removeMainPhoto()">×</button>
-                </div>
-                
-                <div class="photo-upload-main">
-                    <div class="photo-preview secondary" id="secondaryPhotoPreview">
-                        <span class="photo-placeholder">➕</span>
-                        <div class="photo-label secondary">Добавьте до 3 дополнительных фото</div>
                     </div>
-                    <input type="file" id="secondaryPhotoInput" accept="image/*" class="photo-input" 
-                           multiple onchange="handleSecondaryPhotoUpload(event)">
-                    <button type="button" class="btn-remove-photo" onclick="removeAllSecondaryPhotos()">×</button>
                     <input type="file" id="secondaryPhotoInput" accept="image/*" class="photo-input" 
                            multiple onchange="handleSecondaryPhotoUpload(event)">
                     <button type="button" class="btn-remove-photo" onclick="removeAllSecondaryPhotos()">×</button>
@@ -106,31 +75,23 @@
         
         <div class="form-actions">
             <button class="btn btn-cancel" onclick="cancelAddPlace()">Отмена</button>
-            <button class="btn btn-success" onclick="savePlace()" id="saveButton">Сохранить</button>
+            <button class="btn btn-success" onclick="savePlace()">Сохранить</button>
         </div>
     </div>
     {% endif %}
-    {% endif %}
 
     <script>
-        // Инициализация Telegram Web App
-        let tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрываем приложение на весь экран
-        tg.enableClosingConfirmation(); // Включаем подтверждение закрытия
-        
-        const TELEGRAM_USER_ID = tg.initDataUnsafe?.user?.id || "{{ user_id }}";
+        const USER_ID = "{{ user_id }}";
         const IS_ADMIN = {{ is_admin|tojson }};
-        
         let map, addPlaceListener, selectedCoords, tempMarker, selectedAddress = '';
         let suggestTimeout;
         let uploadedPhotos = {
             main: null,
-            secondary: []
+            secondary: [] // Теперь это массив для нескольких фото
         };
         const MAX_SECONDARY_PHOTOS = 3;
         
         ymaps.ready(initMap);
-
 
         function initMap() {
             map = new ymaps.Map("map", {
@@ -150,6 +111,7 @@
             setupPhotoUploads();
             {% endif %}
             
+            // Обработчик клика вне поля ввода для скрытия подсказок
             document.addEventListener('click', function(e) {
                 if (!e.target.closest('.address-input-container') && 
                     !e.target.closest('.suggestions-container')) {
@@ -187,17 +149,17 @@
             const availableSlots = MAX_SECONDARY_PHOTOS - uploadedPhotos.secondary.length;
             
             if (availableSlots <= 0) {
-                showNotification(`Максимум можно загрузить ${MAX_SECONDARY_PHOTOS} дополнительных фото`, 'warning');
+                alert(`Максимум можно загрузить ${MAX_SECONDARY_PHOTOS} дополнительных фото`);
                 return;
             }
             
             const filesToUpload = files.slice(0, availableSlots);
             
             if (files.length > availableSlots) {
-                showNotification(`Загружено ${filesToUpload.length} из ${files.length} фото. Максимум: ${MAX_SECONDARY_PHOTOS}`, 'info');
+                alert(`Загружено ${filesToUpload.length} из ${files.length} фото. Максимум: ${MAX_SECONDARY_PHOTOS}`);
             }
             
-            filesToUpload.forEach((file) => {
+            filesToUpload.forEach((file, index) => {
                 if (file.type.startsWith('image/')) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
@@ -225,8 +187,10 @@
             let previewHTML = '';
             
             if (photoCount === 1) {
+                // Одно фото - занимает весь квадрат
                 previewHTML = `<img src="${uploadedPhotos.secondary[0].url}" alt="Дополнительное фото 1">`;
             } else {
+                // Несколько фото - сетка 2x2
                 previewHTML = '<div class="photo-preview-grid">';
                 uploadedPhotos.secondary.slice(0, 4).forEach((photo, index) => {
                     previewHTML += `<img src="${photo.url}" alt="Дополнительное фото ${index + 1}">`;
@@ -234,7 +198,9 @@
                 previewHTML += '</div>';
             }
             
+            // Добавляем счетчик фото
             previewHTML += `<div class="photo-counter">${photoCount}/${MAX_SECONDARY_PHOTOS}</div>`;
+            
             preview.innerHTML = previewHTML;
             preview.classList.add('has-photos');
         }
@@ -255,8 +221,13 @@
             document.getElementById('secondaryPhotoInput').value = '';
         }
         
+        function removeSingleSecondaryPhoto(index) {
+            uploadedPhotos.secondary.splice(index, 1);
+            updateSecondaryPhotoPreview();
+        }
+        
         function loadPlaces() {
-            fetch(`/api/places?telegram_user_id=${TELEGRAM_USER_ID}`)
+            fetch(`/api/places?user_id=${USER_ID}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('API недоступно');
@@ -268,7 +239,6 @@
                 })
                 .catch(error => {
                     console.log('Ошибка загрузки мест:', error);
-                    showNotification('Ошибка загрузки мест', 'error');
                 });
         }
         
@@ -280,7 +250,6 @@
                         <p><strong>Дата:</strong> ${place.date_visited}</p>
                         ${place.description ? `<p><strong>Описание:</strong> ${place.description}</p>` : ''}
                         ${place.address ? `<p><strong>Адрес:</strong> ${place.address}</p>` : ''}
-                        ${place.photos && place.photos.main ? `<div class="photo-thumbnail"><img src="/api/photos/${place.photos.main}" alt="Фото"></div>` : ''}
                         ${IS_ADMIN ? `<button onclick="editPlace(${place.id})" class="balloon-btn">✏️ Редактировать</button>` : ''}
                     </div>
                 `
@@ -314,6 +283,7 @@
             });
         
             map.geoObjects.add(tempMarker);
+        
             getAddressFromCoords(coords);
         
             tempMarker.events.add('dragend', function() {
@@ -336,14 +306,16 @@
             updateAddressStatus('Ищем...', 'loading');
             hideSuggestions();
             
+            // Используем прямое геокодирование как в Яндекс Картах
             ymaps.geocode(query, {
-                results: 1,
-                boundedBy: map.getBounds(),
+                results: 1, // Берем только лучший результат
+                boundedBy: map.getBounds(), // Ищем в области видимости карты
                 strictBounds: false
             }).then(function(res) {
                 const foundObjects = res.geoObjects;
                 
                 if (foundObjects.getLength() === 0) {
+                    // Если не нашли, пробуем поискать без ограничений по области
                     return ymaps.geocode(query, { results: 1 });
                 }
                 return res;
@@ -360,8 +332,10 @@
                 const foundCoords = firstFoundObject.geometry.getCoordinates();
                 const foundAddress = firstFoundObject.getAddressLine();
                 
+                // Получаем наименование объекта (если есть)
                 let foundName = firstFoundObject.properties.get('name');
                 if (!foundName || foundName === foundAddress) {
+                    // Если имя совпадает с адресом или отсутствует, используем текст запроса
                     foundName = query;
                 }
                 
@@ -381,6 +355,7 @@
                 }
                 
                 map.setCenter(foundCoords, 16, {duration: 500});
+                
                 updateAddressStatus('Место найдено!', 'success');
                 
             }).catch(function(err) {
@@ -392,14 +367,12 @@
         function showSuggestions(query) {
             if (!query || query.length < 2) {
                 hideSuggestions();
-        function showSuggestions(query) {
-            if (!query || query.length < 2) {
-                hideSuggestions();
                 return;
             }
             
             clearTimeout(suggestTimeout);
             suggestTimeout = setTimeout(() => {
+                // Используем suggest с параметрами для лучших результатов
                 ymaps.suggest(query, {
                     boundedBy: map.getBounds(),
                     strictBounds: false,
@@ -416,6 +389,8 @@
                     items.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'suggestion-item';
+                        
+                        // Добавляем иконку типа места
                         const icon = getSuggestionIcon(item);
                         div.innerHTML = `
                             <span class="suggestion-icon">${icon}</span>
@@ -432,9 +407,10 @@
                     
                     container.classList.remove('hidden');
                 });
-            }, 200);
+            }, 200); // Уменьшил задержку для более быстрого отклика
         }
         
+        // Функция для получения иконки типа места
         function getSuggestionIcon(item) {
             const types = item.tags || [];
             if (types.includes('street')) return '🏠';
@@ -449,56 +425,6 @@
             document.getElementById('suggestions').classList.add('hidden');
         }
         
-        function getAddressFromCoords(coords) {
-            updateAddressStatus('Определяем адрес...', 'loading');
-            
-            ymaps.geocode(coords).then(function(res) {
-                const firstGeoObject = res.geoObjects.get(0);
-                
-                if (firstGeoObject) {
-                    const address = firstGeoObject.getAddressLine();
-                    selectedAddress = address;
-                    document.getElementById('placeAddress').value = address;
-                    updateAddressStatus('Адрес определен', 'success');
-                } else {
-                    selectedAddress = 'Адрес не определен';
-                    document.getElementById('placeAddress').value = 'Адрес не определен';
-                    updateAddressStatus('Адрес не определен', 'warning');
-                }
-            }).catch(function(err) {
-                console.log('Ошибка геокодирования:', err);
-                selectedAddress = 'Адрес не определен';
-                document.getElementById('placeAddress').value = 'Адрес не определен';
-                updateAddressStatus('Ошибка определения адреса', 'error');
-            });
-        }
-        
-        function handleAddressKeypress(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                hideSuggestions();
-                geocodeAddress();
-            }
-        }
-        
-        function updateAddressStatus(message, type) {
-            const statusElement = document.getElementById('addressStatus');
-            statusElement.textContent = message;
-            statusElement.className = 'address-status ' + type;
-        }
-        
-        function toggleAddMode() {
-            if (addPlaceListener) {
-                disableAddMode();
-            } else {
-                enableAddMode();
-            }
-        }
-        
-        function enableAddMode() {
-            document.querySelector('.controls .btn-primary').classList.add('active');
-            addPlaceListener = true;
-            updateAddressStatus('Кликните на карте или введите адрес/название', 'info');
         function getAddressFromCoords(coords) {
             updateAddressStatus('Определяем адрес...', 'loading');
             
@@ -578,67 +504,28 @@
             removeAllSecondaryPhotos();
         }
         
-        async function savePlace() {
-            const title = document.getElementById('placeTitle').value.trim();
+        function savePlace() {
+            const title = document.getElementById('placeTitle').value;
             if (!title || !selectedCoords) {
-                showNotification('Заполните название места и выберите точку на карте', 'error');
+                alert('Заполните название места и выберите точку на карте');
                 return;
             }
             
-            const saveButton = document.getElementById('saveButton');
-            const originalText = saveButton.innerHTML;
-            saveButton.innerHTML = '⏳ Сохранение...';
-            saveButton.disabled = true;
+            const address = document.getElementById('placeAddress').value.trim() || selectedAddress;
             
-            try {
-                const address = document.getElementById('placeAddress').value.trim() || selectedAddress;
-                
-                // Создаем FormData для отправки файлов
-                const formData = new FormData();
-                formData.append('telegram_user_id', TELEGRAM_USER_ID);
-                formData.append('title', title);
-                formData.append('description', document.getElementById('placeDescription').value);
-                formData.append('date_visited', document.getElementById('placeDate').value);
-                formData.append('lat', selectedCoords[0]);
-                formData.append('lon', selectedCoords[1]);
-                formData.append('address', address);
-                
-                // Добавляем главное фото
-                if (uploadedPhotos.main) {
-                    formData.append('main_photo', uploadedPhotos.main);
-                }
-                
-                // Добавляем дополнительные фото
-                uploadedPhotos.secondary.forEach((photo, index) => {
-                    formData.append(`secondary_photos`, photo.file);
-                });
-                
-                const response = await fetch('/api/places', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Ошибка сервера');
-                }
-                
-                const result = await response.json();
-                showNotification('Место успешно сохранено!', 'success');
-                
-                // Обновляем карту
-                createPlacemark(result.place);
-                
-                // Закрываем панель добавления
-                disableAddMode();
-                
-            } catch (error) {
-                console.error('Ошибка сохранения:', error);
-                showNotification('Ошибка сохранения: ' + error.message, 'error');
-            } finally {
-                saveButton.innerHTML = originalText;
-                saveButton.disabled = false;
-            }
+            const placeData = {
+                user_id: USER_ID,
+                title: title,
+                description: document.getElementById('placeDescription').value,
+                date_visited: document.getElementById('placeDate').value,
+                lat: selectedCoords[0],
+                lon: selectedCoords[1],
+                address: address,
+                photos: uploadedPhotos
+            };
+            
+            console.log('Сохранение места:', placeData);
+            alert('Функция сохранения требует настройки бэкенд API');
         }
         
         function cancelAddPlace() {
@@ -646,30 +533,18 @@
         }
         
         function shareMap() {
-            const shareUrl = `${window.location.origin}/guest/${TELEGRAM_USER_ID}`;
-            
-            // Используем Telegram Share функционал
-            if (tg.isVersionAtLeast('6.0')) {
-                tg.shareUrl(shareUrl, 'Моя карта "Было дело"');
-            } else {
-                // Альтернативный способ для старых версий
-                tg.showAlert(`Ссылка для просмотра вашей карты:\n\n${shareUrl}`);
-            }
-        }
-        
-        // Функция для показа уведомлений
-        function showNotification(message, type = 'info') {
-            if (tg.isVersionAtLeast('6.0')) {
-                tg.showPopup({
-                    title: type === 'error' ? 'Ошибка' : type === 'success' ? 'Успех' : 'Информация',
-                    message: message,
-                    buttons: [{ type: 'ok' }]
+            const shareUrl = `${window.location.origin}/guest/${USER_ID}`;
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Моя карта "Было дело"',
+                    url: shareUrl
                 });
             } else {
-                tg.showAlert(message);
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                    alert('Ссылка скопирована в буфер обмена!\n\n' + shareUrl);
+                });
             }
         }
-        {% endif %}
         {% endif %}
     </script>
 </body>
