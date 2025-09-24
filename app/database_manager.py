@@ -139,7 +139,7 @@ class DatabaseManager:
                 indexes = [
                     "CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id);",
                     "CREATE INDEX IF NOT EXISTS idx_marks_user_id ON marks(user_id);",
-                    "CREATE INDEX IF NOT EXISTS idx_marks_coordinates ON marks(lat, y);",
+                    "CREATE INDEX IF NOT EXISTS idx_marks_coordinates ON marks(lat, lon);",
                     "CREATE INDEX IF NOT EXISTS idx_photos_mark_id ON photos(mark_id);",
                     "CREATE INDEX IF NOT EXISTS idx_photos_is_main ON photos(is_main);"
                 ]

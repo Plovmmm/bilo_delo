@@ -4,16 +4,13 @@ import threading
 from database_manager import DatabaseManager
 import os
 from dotenv import load_dotenv
-import hashlib
-import hmac
-import json
 from werkzeug.utils import secure_filename
 
 
 load_dotenv()
 YANDEX_MAPS_API_KEY = os.getenv("YANDEX_MAPS_API_KEY")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-UPLOAD_FOLDER = "/upload"
+UPLOAD_FOLDER = "upload"
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'heif', 'bmp'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
