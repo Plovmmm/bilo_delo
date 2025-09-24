@@ -1,11 +1,9 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from flask import Flask, send_from_directory
-from flask import Flask, render_template, request, jsonify
-import threading
 import os
 from dotenv import load_dotenv
+from web_app import startFlask
 
 # Настройка логирования
 # logging.basicConfig(
@@ -19,28 +17,6 @@ load_dotenv()
 # Токен бота от BotFather
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 web_app_url = os.getenv("WEB_APP_URL")
-
-# Создаем Flask приложение для сервера статических файлов
-app = Flask(__name__,
-    template_folder='templates',
-    static_folder='static'
-)
-
-
-@app.route('/')
-def index():
-    """Главная страница мини-приложения"""
-    return render_template('index.html', is_admin=True)
-
-
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory('web', path)
-
-
-def run_flask():
-    """Запуск Flask сервера"""
-    app.run(host='0.0.0.0', port=5000, debug=False)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,8 +53,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Основная функция"""
     # Запускаем Flask в отдельном потоке
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
+    startFlask(daemon=True)
     
     # Создаем приложение бота
     application = Application.builder().token(BOT_TOKEN).build()
