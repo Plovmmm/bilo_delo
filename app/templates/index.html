@@ -21,9 +21,27 @@
             <span class="btn-icon">🔗</span>
             <span class="btn-text">Поделиться</span>
         </button>
+    {% if is_admin %}
+    <div class="controls">
+        <button class="btn btn-primary" onclick="toggleAddMode()">
+            <span class="btn-icon">➕</span>
+            <span class="btn-text">Добавить место</span>
+        </button>
+        <button class="btn btn-secondary" onclick="shareMap()">
+            <span class="btn-icon">🔗</span>
+            <span class="btn-text">Поделиться</span>
+        </button>
     </div>
 
     <div id="addPlacePanel" class="panel hidden">
+        <h3>Добавить новое место</h3>
+        
+        <div class="photo-upload-section">
+            <div class="photo-column">
+                <div class="photo-upload-main">
+                    <div class="photo-preview" id="mainPhotoPreview">
+                        <span class="photo-placeholder">📷</span>
+                        <div class="photo-label">Загрузите главное фото</div>
         <h3>Добавить новое место</h3>
         
         <div class="photo-upload-section">
@@ -42,7 +60,19 @@
                     <div class="photo-preview secondary" id="secondaryPhotoPreview">
                         <span class="photo-placeholder">➕</span>
                         <div class="photo-label secondary">Добавьте до 3 дополнительных фото</div>
+                    <input type="file" id="mainPhotoInput" accept="image/*" class="photo-input" 
+                           onchange="handleMainPhotoUpload(event)">
+                    <button type="button" class="btn-remove-photo" onclick="removeMainPhoto()">×</button>
+                </div>
+                
+                <div class="photo-upload-main">
+                    <div class="photo-preview secondary" id="secondaryPhotoPreview">
+                        <span class="photo-placeholder">➕</span>
+                        <div class="photo-label secondary">Добавьте до 3 дополнительных фото</div>
                     </div>
+                    <input type="file" id="secondaryPhotoInput" accept="image/*" class="photo-input" 
+                           multiple onchange="handleSecondaryPhotoUpload(event)">
+                    <button type="button" class="btn-remove-photo" onclick="removeAllSecondaryPhotos()">×</button>
                     <input type="file" id="secondaryPhotoInput" accept="image/*" class="photo-input" 
                            multiple onchange="handleSecondaryPhotoUpload(event)">
                     <button type="button" class="btn-remove-photo" onclick="removeAllSecondaryPhotos()">×</button>
@@ -80,6 +110,7 @@
         </div>
     </div>
     {% endif %}
+    {% endif %}
 
     <script>
         // Инициализация Telegram Web App
@@ -99,6 +130,7 @@
         const MAX_SECONDARY_PHOTOS = 3;
         
         ymaps.ready(initMap);
+
 
         function initMap() {
             map = new ymaps.Map("map", {
@@ -360,6 +392,9 @@
         function showSuggestions(query) {
             if (!query || query.length < 2) {
                 hideSuggestions();
+        function showSuggestions(query) {
+            if (!query || query.length < 2) {
+                hideSuggestions();
                 return;
             }
             
@@ -414,6 +449,56 @@
             document.getElementById('suggestions').classList.add('hidden');
         }
         
+        function getAddressFromCoords(coords) {
+            updateAddressStatus('Определяем адрес...', 'loading');
+            
+            ymaps.geocode(coords).then(function(res) {
+                const firstGeoObject = res.geoObjects.get(0);
+                
+                if (firstGeoObject) {
+                    const address = firstGeoObject.getAddressLine();
+                    selectedAddress = address;
+                    document.getElementById('placeAddress').value = address;
+                    updateAddressStatus('Адрес определен', 'success');
+                } else {
+                    selectedAddress = 'Адрес не определен';
+                    document.getElementById('placeAddress').value = 'Адрес не определен';
+                    updateAddressStatus('Адрес не определен', 'warning');
+                }
+            }).catch(function(err) {
+                console.log('Ошибка геокодирования:', err);
+                selectedAddress = 'Адрес не определен';
+                document.getElementById('placeAddress').value = 'Адрес не определен';
+                updateAddressStatus('Ошибка определения адреса', 'error');
+            });
+        }
+        
+        function handleAddressKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                hideSuggestions();
+                geocodeAddress();
+            }
+        }
+        
+        function updateAddressStatus(message, type) {
+            const statusElement = document.getElementById('addressStatus');
+            statusElement.textContent = message;
+            statusElement.className = 'address-status ' + type;
+        }
+        
+        function toggleAddMode() {
+            if (addPlaceListener) {
+                disableAddMode();
+            } else {
+                enableAddMode();
+            }
+        }
+        
+        function enableAddMode() {
+            document.querySelector('.controls .btn-primary').classList.add('active');
+            addPlaceListener = true;
+            updateAddressStatus('Кликните на карте или введите адрес/название', 'info');
         function getAddressFromCoords(coords) {
             updateAddressStatus('Определяем адрес...', 'loading');
             
@@ -584,6 +669,7 @@
                 tg.showAlert(message);
             }
         }
+        {% endif %}
         {% endif %}
     </script>
 </body>
