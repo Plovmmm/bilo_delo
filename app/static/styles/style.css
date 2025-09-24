@@ -42,6 +42,43 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
+/* Временная метка */
+.temp-marker {
+    position: absolute;
+    z-index: 1000;
+    pointer-events: none;
+}
+.marker-point {
+    width: 20px;
+    height: 20px;
+    background: #ff4444;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.marker-btn {
+    pointer-events: all;
+    margin-left: 25px;
+    padding: 10px 16px;
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+.marker-btn:hover {
+    background: #cc3333;
+    transform: translateY(-1px);
+}
+
+
 .btn-primary {
     background: #007AFF;
     color: white;
@@ -126,9 +163,45 @@ body {
     justify-content: flex-end;
 }
 
-/* Баллун метки */
+/* Стили для всплывающих балунов меток */
 .balloon-content {
-    min-width: 200px;
+    max-width: 250px;
+}
+
+.place-photos {
+    margin: 10px 0;
+}
+
+.place-photos img {
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.place-photos img:hover {
+    transform: scale(1.1); /* Увеличение при наведении */
+}
+
+.balloon-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.balloon-btn:hover {
+    background: #0056b3;
+}
+
+/*баллун 2*/
+
+/* Стили содержимого балуна метки */
+.balloon-content {
+    min-width: 200px; /* Минимальная ширина */
 }
 
 .balloon-content p {
@@ -145,6 +218,7 @@ body {
     border-radius: 6px;
     cursor: pointer;
 }
+
 
 /* Адаптивность */
 @media (max-width: 768px) {
@@ -184,5 +258,4 @@ body {
 .panel {
     animation: slideUp 0.3s ease-out;
 }
-
 
