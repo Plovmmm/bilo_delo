@@ -4,98 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🗺️ Было дело - Моя карта</title>
-    <script src="https://api-maps.yandex.ru/2.1/?apikey={{ yandex_maps_key }}&lang=ru_RU" type="text/javascript"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles/style.css') }}">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=e3ae341e-a8e0-4284-8d2f-cc20984dc27e&lang=ru_RU" type="text/javascript"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div id="map"></div>
     
-    <!-- Временная метка с кнопкой -->
-    <div id="tempMarker" class="temp-marker hidden">
-        <div class="marker-point"></div>
-        <button class="marker-btn" onclick="openAddPanel()">➕ Добавить место</button>
+    {% if is_admin %}
+    <div class="controls">
+        <button class="btn btn-primary" onclick="toggleAddMode()">
+            <span class="btn-icon">➕</span>
+            <span class="btn-text">Добавить место</span>
+        </button>
+        <button class="btn btn-secondary" onclick="shareMap()">
+            <span class="btn-icon">🔗</span>
+            <span class="btn-text">Поделиться</span>
+        </button>
     </div>
 
-    <!-- Панель добавления места -->
     <div id="addPlacePanel" class="panel hidden">
-        <div class="panel-header">
-            <h3>Добавить новое место</h3>
-            <button class="btn-close" onclick="closeAddPanel()">×</button>
-        </div>
+        <h3>Добавить новое место</h3>
         
-        <form id="placeForm" class="form">
-            <!-- Загрузка фото -->
-            <div class="form-section">
-                <label class="form-label">Фотографии места</label>
-                <div class="photo-upload">
-                    <div class="photo-main">
-                        <label for="mainPhoto" class="photo-upload-area">
-                            <input type="file" id="mainPhoto" accept="image/*" class="hidden">
-                            <span class="photo-icon">📷</span>
-                            <span class="photo-text">Главное фото *</span>
-                            <img id="mainPhotoPreview" class="hidden">
-                        </label>
+        <div class="photo-upload-section">
+            <div class="photo-column">
+                <div class="photo-upload-main">
+                    <div class="photo-preview" id="mainPhotoPreview">
+                        <span class="photo-placeholder">📷</span>
+                        <div class="photo-label">Загрузите главное фото</div>
                     </div>
-                    <div class="photo-additional">
-                        <label for="photo1" class="photo-upload-area small">
-                            <input type="file" id="photo1" accept="image/*" class="hidden">
-                            <span class="photo-icon">➕</span>
-                            <span>Фото 2</span>
-                            <img id="photo1Preview" class="hidden">
-                        </label>
-                        <label for="photo2" class="photo-upload-area small">
-                            <input type="file" id="photo2" accept="image/*" class="hidden">
-                            <span class="photo-icon">➕</span>
-                            <span>Фото 3</span>
-                            <img id="photo2Preview" class="hidden">
-                        </label>
-                        <label for="photo3" class="photo-upload-area small">
-                            <input type="file" id="photo3" accept="image/*" class="hidden">
-                            <span class="photo-icon">➕</span>
-                            <span>Фото 4</span>
-                            <img id="photo3Preview" class="hidden">
-                        </label>
+                    <input type="file" id="mainPhotoInput" accept="image/*" class="photo-input" 
+                           onchange="handleMainPhotoUpload(event)">
+                    <button type="button" class="btn-remove-photo" onclick="removeMainPhoto()">×</button>
+                </div>
+                
+                <div class="photo-upload-main">
+                    <div class="photo-preview secondary" id="secondaryPhotoPreview">
+                        <span class="photo-placeholder">➕</span>
+                        <div class="photo-label secondary">Добавьте до 3 дополнительных фото</div>
                     </div>
+                    <input type="file" id="secondaryPhotoInput" accept="image/*" class="photo-input" 
+                           multiple onchange="handleSecondaryPhotoUpload(event)">
+                    <button type="button" class="btn-remove-photo" onclick="removeAllSecondaryPhotos()">×</button>
                 </div>
             </div>
-
-            <!-- Основная информация -->
-            <div class="form-group">
-                <label for="placeTitle" class="form-label">Название места *</label>
-                <input type="text" id="placeTitle" placeholder="Например: Ресторан 'У озера'" required>
+            
+            <div class="form-column">
+                <div class="form-group">
+                    <input type="text" id="placeTitle" placeholder="Название места *" required>
+                </div>
+                <div class="form-group">
+                    <textarea id="placeDescription" placeholder="Описание (необязательно)"></textarea>
+                </div>
+                <div class="form-group">
+                    <input type="date" id="placeDate" value="{{ today }}">
+                </div>
+                <div class="form-group">
+                    <div class="address-input-container">
+                        <input type="text" id="placeAddress" placeholder="Адрес или название места" 
+                               onkeypress="handleAddressKeypress(event)"
+                               oninput="showSuggestions(this.value)">
+                        <button type="button" class="btn-geocode" onclick="geocodeAddress()" title="Найти на карте">
+                            <span class="btn-icon">📍</span>
+                        </button>
+                    </div>
+                    <div id="suggestions" class="suggestions-container hidden"></div>
+                    <div id="addressStatus" class="address-status"></div>
+                </div>
             </div>
-
-            <div class="form-group">
-                <label for="placeDate" class="form-label">Дата посещения *</label>
-                <input type="date" id="placeDate" value="{{ today }}" required>
-            </div>
-
-            <div class="form-group">
-                <label for="placeAddress" class="form-label">Адрес</label>
-                <input type="text" id="placeAddress" placeholder="Адрес определится автоматически" readonly>
-                <small>Адрес определяется по выбранной точке на карте</small>
-            </div>
-
-            <div class="form-group">
-                <label for="placeDescription" class="form-label">Описание</label>
-                <textarea id="placeDescription" placeholder="Расскажите о ваших впечатлениях..." rows="4"></textarea>
-            </div>
-
-            <div class="form-actions">
-                <button type="button" class="btn btn-cancel" onclick="closeAddPanel()">Отмена</button>
-                <button type="submit" class="btn btn-success">Сохранить место</button>
-            </div>
-        </form>
+        </div>
+        
+        <div class="form-actions">
+            <button class="btn btn-cancel" onclick="cancelAddPlace()">Отмена</button>
+            <button class="btn btn-success" onclick="savePlace()" id="saveButton">Сохранить</button>
+        </div>
     </div>
+    {% endif %}
 
     <script>
-        const USER_ID = "{{ user_id }}";
+        // Инициализация Telegram Web App
+        let tg = window.Telegram.WebApp;
+        tg.expand(); // Раскрываем приложение на весь экран
+        tg.enableClosingConfirmation(); // Включаем подтверждение закрытия
+        
+        const TELEGRAM_USER_ID = tg.initDataUnsafe?.user?.id || "{{ user_id }}";
         const IS_ADMIN = {{ is_admin|tojson }};
-        const TODAY = "{{ today }}";
-        let map, tempMarker, selectedCoords;
+        
+        let map, addPlaceListener, selectedCoords, tempMarker, selectedAddress = '';
+        let suggestTimeout;
+        let uploadedPhotos = {
+            main: null,
+            secondary: []
+        };
+        const MAX_SECONDARY_PHOTOS = 3;
         
         ymaps.ready(initMap);
-        
+
         function initMap() {
             map = new ymaps.Map("map", {
                 center: [55.76, 37.64],
@@ -103,89 +107,136 @@
                 controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
             });
             
-            // Обработчик клика по карте
-            map.events.add('click', function(e) {
-                showTempMarker(e.get('coords'));
-            });
-            
-            loadPlaces();
-        }
-        
-        function showTempMarker(coords) {
-            selectedCoords = coords;
-            
-            // Убираем предыдущую временную метку
-            if (tempMarker) {
-                map.geoObjects.remove(tempMarker);
+            try {
+                loadPlaces();
+            } catch (e) {
+                console.log('API мест временно недоступно');
             }
             
-            // Создаем красную временную метку
-            tempMarker = new ymaps.Placemark(coords, {}, {
-                preset: 'islands#redIcon',
-                draggable: true
-            });
+            {% if is_admin %}
+            setupAdminFeatures();
+            setupPhotoUploads();
+            {% endif %}
             
-            map.geoObjects.add(tempMarker);
-            
-            // Показываем кнопку "Добавить место"
-            showAddButton(coords);
-            
-            // Получаем адрес для выбранных координат
-            getAddress(coords);
-            
-            // Обработчик перемещения метки
-            tempMarker.events.add('dragend', function() {
-                const newCoords = tempMarker.geometry.getCoordinates();
-                selectedCoords = newCoords;
-                showAddButton(newCoords);
-                getAddress(newCoords);
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.address-input-container') && 
+                    !e.target.closest('.suggestions-container')) {
+                    hideSuggestions();
+                }
             });
         }
         
-        function showAddButton(coords) {
-            const tempMarkerElement = document.getElementById('tempMarker');
-            const pixelCoords = map.convertToPagePixels(coords);
+        function setupPhotoUploads() {
+            document.getElementById('mainPhotoPreview').addEventListener('click', function() {
+                document.getElementById('mainPhotoInput').click();
+            });
             
-            tempMarkerElement.style.left = (pixelCoords[0] + 20) + 'px';
-            tempMarkerElement.style.top = (pixelCoords[1] - 40) + 'px';
-            tempMarkerElement.classList.remove('hidden');
+            document.getElementById('secondaryPhotoPreview').addEventListener('click', function() {
+                document.getElementById('secondaryPhotoInput').click();
+            });
         }
         
-        function hideAddButton() {
-            document.getElementById('tempMarker').classList.add('hidden');
+        function handleMainPhotoUpload(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('mainPhotoPreview');
+                    preview.innerHTML = `<img src="${e.target.result}" alt="Главное фото">`;
+                    preview.classList.add('has-photo');
+                    uploadedPhotos.main = file;
+                };
+                reader.readAsDataURL(file);
+            }
         }
         
-        function openAddPanel() {
-            document.getElementById('addPlacePanel').classList.remove('hidden');
-            hideAddButton();
-            initPhotoUpload();
-        }
-        
-        function closeAddPanel() {
-            document.getElementById('addPlacePanel').classList.add('hidden');
+        function handleSecondaryPhotoUpload(event) {
+            const files = Array.from(event.target.files);
+            const availableSlots = MAX_SECONDARY_PHOTOS - uploadedPhotos.secondary.length;
             
-            // Убираем временную метку
-            if (tempMarker) {
-                map.geoObjects.remove(tempMarker);
-                tempMarker = null;
+            if (availableSlots <= 0) {
+                showNotification(`Максимум можно загрузить ${MAX_SECONDARY_PHOTOS} дополнительных фото`, 'warning');
+                return;
             }
             
-            clearForm();
+            const filesToUpload = files.slice(0, availableSlots);
+            
+            if (files.length > availableSlots) {
+                showNotification(`Загружено ${filesToUpload.length} из ${files.length} фото. Максимум: ${MAX_SECONDARY_PHOTOS}`, 'info');
+            }
+            
+            filesToUpload.forEach((file) => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        uploadedPhotos.secondary.push({
+                            file: file,
+                            url: e.target.result
+                        });
+                        updateSecondaryPhotoPreview();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
         }
         
-        function getAddress(coords) {
-            ymaps.geocode(coords).then(function(res) {
-                const firstGeoObject = res.geoObjects.get(0);
-                const address = firstGeoObject ? firstGeoObject.getAddressLine() : 'Адрес не определен';
-                document.getElementById('placeAddress').value = address;
-            });
+        function updateSecondaryPhotoPreview() {
+            const preview = document.getElementById('secondaryPhotoPreview');
+            const photoCount = uploadedPhotos.secondary.length;
+            
+            if (photoCount === 0) {
+                preview.innerHTML = '<span class="photo-placeholder">➕</span><div class="photo-label secondary">Добавьте до 3 дополнительных фото</div>';
+                preview.classList.remove('has-photos');
+                return;
+            }
+            
+            let previewHTML = '';
+            
+            if (photoCount === 1) {
+                previewHTML = `<img src="${uploadedPhotos.secondary[0].url}" alt="Дополнительное фото 1">`;
+            } else {
+                previewHTML = '<div class="photo-preview-grid">';
+                uploadedPhotos.secondary.slice(0, 4).forEach((photo, index) => {
+                    previewHTML += `<img src="${photo.url}" alt="Дополнительное фото ${index + 1}">`;
+                });
+                previewHTML += '</div>';
+            }
+            
+            previewHTML += `<div class="photo-counter">${photoCount}/${MAX_SECONDARY_PHOTOS}</div>`;
+            preview.innerHTML = previewHTML;
+            preview.classList.add('has-photos');
+        }
+        
+        function removeMainPhoto() {
+            const preview = document.getElementById('mainPhotoPreview');
+            preview.innerHTML = '<span class="photo-placeholder">📷</span><div class="photo-label">Загрузите главное фото</div>';
+            preview.classList.remove('has-photo');
+            uploadedPhotos.main = null;
+            document.getElementById('mainPhotoInput').value = '';
+        }
+        
+        function removeAllSecondaryPhotos() {
+            const preview = document.getElementById('secondaryPhotoPreview');
+            preview.innerHTML = '<span class="photo-placeholder">➕</span><div class="photo-label secondary">Добавьте до 3 дополнительных фото</div>';
+            preview.classList.remove('has-photos');
+            uploadedPhotos.secondary = [];
+            document.getElementById('secondaryPhotoInput').value = '';
         }
         
         function loadPlaces() {
-            fetch(`/api/places?user_id=${USER_ID}`)
-                .then(response => response.json())
+            fetch(`/api/places?telegram_user_id=${TELEGRAM_USER_ID}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('API недоступно');
+                    }
+                    return response.json();
+                })
                 .then(places => {
                     places.forEach(place => createPlacemark(place));
+                })
+                .catch(error => {
+                    console.log('Ошибка загрузки мест:', error);
+                    showNotification('Ошибка загрузки мест', 'error');
                 });
         }
         
@@ -197,12 +248,7 @@
                         <p><strong>Дата:</strong> ${place.date_visited}</p>
                         ${place.description ? `<p><strong>Описание:</strong> ${place.description}</p>` : ''}
                         ${place.address ? `<p><strong>Адрес:</strong> ${place.address}</p>` : ''}
-                        ${place.photos && place.photos.length > 0 ? 
-                            `<div class="place-photos">
-                                ${place.photos.map(photo => 
-                                    `<img src="${photo.url}" alt="${place.title}" style="max-width: 100px; margin: 5px;">`
-                                ).join('')}
-                            </div>` : ''}
+                        ${place.photos && place.photos.main ? `<div class="photo-thumbnail"><img src="/api/photos/${place.photos.main}" alt="Фото"></div>` : ''}
                         ${IS_ADMIN ? `<button onclick="editPlace(${place.id})" class="balloon-btn">✏️ Редактировать</button>` : ''}
                     </div>
                 `
@@ -213,176 +259,332 @@
             map.geoObjects.add(placemark);
         }
         
-        function initPhotoUpload() {
-            // Инициализация загрузки фото
-            const photoInputs = ['mainPhoto', 'photo1', 'photo2', 'photo3'];
-            
-            photoInputs.forEach(inputId => {
-                const input = document.getElementById(inputId);
-                const preview = document.getElementById(inputId + 'Preview');
-                const uploadArea = input.parentElement;
-                
-                input.addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (file) {
-                        previewFile(file, preview, uploadArea);
-                    }
-                });
-                
-                // Drag and drop
-                uploadArea.addEventListener('dragover', function(e) {
-                    e.preventDefault();
-                    uploadArea.classList.add('dragover');
-                });
-                
-                uploadArea.addEventListener('dragleave', function() {
-                    uploadArea.classList.remove('dragover');
-                });
-                
-                uploadArea.addEventListener('drop', function(e) {
-                    e.preventDefault();
-                    uploadArea.classList.remove('dragover');
-                    const file = e.dataTransfer.files[0];
-                    if (file) {
-                        input.files = e.dataTransfer.files;
-                        previewFile(file, preview, uploadArea);
-                    }
-                });
-                
-                // Клик по превью для удаления
-                preview.addEventListener('click', function() {
-                    removePhoto(input, preview, uploadArea);
-                });
-            });
-        }
-        
-        function previewFile(file, preview, uploadArea) {
-            if (!file.type.match('image.*')) {
-                alert('Пожалуйста, выберите изображение');
-                return;
-            }
-            
-            if (file.size > 5 * 1024 * 1024) {
-                alert('Размер файла не должен превышать 5MB');
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                preview.src = e.target.result;
-                preview.classList.remove('hidden');
-                uploadArea.querySelector('.photo-icon').classList.add('hidden');
-                uploadArea.querySelector('.photo-text').classList.add('hidden');
-            };
-            reader.readAsDataURL(file);
-        }
-        
-        function removePhoto(input, preview, uploadArea) {
-            input.value = '';
-            preview.src = '';
-            preview.classList.add('hidden');
-            uploadArea.querySelector('.photo-icon').classList.remove('hidden');
-            uploadArea.querySelector('.photo-text').classList.remove('hidden');
-        }
-        
-        function clearForm() {
-            document.getElementById('placeForm').reset();
-            document.getElementById('placeDate').value = TODAY;
-            
-            // Очищаем превью фото
-            const previews = ['mainPhotoPreview', 'photo1Preview', 'photo2Preview', 'photo3Preview'];
-            const inputs = ['mainPhoto', 'photo1', 'photo2', 'photo3'];
-            
-            previews.forEach(previewId => {
-                const preview = document.getElementById(previewId);
-                preview.src = '';
-                preview.classList.add('hidden');
-            });
-            
-            inputs.forEach(inputId => {
-                const input = document.getElementById(inputId);
-                const uploadArea = input.parentElement;
-                uploadArea.querySelector('.photo-icon').classList.remove('hidden');
-                uploadArea.querySelector('.photo-text').classList.remove('hidden');
-            });
-        }
-        
-        // Обработчик отправки формы
-        document.getElementById('placeForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            savePlace();
-        });
-        
-        function savePlace() {
-            const title = document.getElementById('placeTitle').value.trim();
-            const mainPhoto = document.getElementById('mainPhoto').files[0];
-            
-            if (!title) {
-                alert('Введите название места');
-                return;
-            }
-            
-            if (!selectedCoords) {
-                alert('Выберите место на карте');
-                return;
-            }
-            
-            if (!mainPhoto) {
-                alert('Добавьте главное фото');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('user_id', USER_ID);
-            formData.append('title', title);
-            formData.append('date_visited', document.getElementById('placeDate').value);
-            formData.append('address', document.getElementById('placeAddress').value);
-            formData.append('description', document.getElementById('placeDescription').value);
-            formData.append('lat', selectedCoords[0]);
-            formData.append('lon', selectedCoords[1]);
-            
-            // Добавляем фото
-            const photoInputs = ['mainPhoto', 'photo1', 'photo2', 'photo3'];
-            photoInputs.forEach(inputId => {
-                const input = document.getElementById(inputId);
-                if (input.files[0]) {
-                    formData.append('photos', input.files[0]);
+        {% if is_admin %}
+        function setupAdminFeatures() {
+            map.events.add('click', function(e) {
+                if (addPlaceListener) {
+                    showTempMarker(e.get('coords'));
                 }
             });
+        }
+
+        function showTempMarker(coords) {
+            selectedCoords = coords;
+        
+            if (tempMarker) {
+                map.geoObjects.remove(tempMarker);
+            }
+        
+            tempMarker = new ymaps.Placemark(coords, {}, {
+                preset: 'islands#redIcon',
+                draggable: true,
+                balloonContent: 'Новое место'
+            });
+        
+            map.geoObjects.add(tempMarker);
+            getAddressFromCoords(coords);
+        
+            tempMarker.events.add('dragend', function() {
+                const newCoords = tempMarker.geometry.getCoordinates();
+                selectedCoords = newCoords;
+                getAddressFromCoords(newCoords);
+            });
             
-            fetch('/api/places', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Место успешно добавлено!');
-                    closeAddPanel();
-                    location.reload();
+            document.getElementById('addPlacePanel').classList.remove('hidden');
+        }
+        
+        function geocodeAddress() {
+            const query = document.getElementById('placeAddress').value.trim();
+            
+            if (!query) {
+                updateAddressStatus('Введите адрес или название места', 'warning');
+                return;
+            }
+            
+            updateAddressStatus('Ищем...', 'loading');
+            hideSuggestions();
+            
+            ymaps.geocode(query, {
+                results: 1,
+                boundedBy: map.getBounds(),
+                strictBounds: false
+            }).then(function(res) {
+                const foundObjects = res.geoObjects;
+                
+                if (foundObjects.getLength() === 0) {
+                    return ymaps.geocode(query, { results: 1 });
+                }
+                return res;
+                
+            }).then(function(res) {
+                const foundObjects = res.geoObjects;
+                
+                if (foundObjects.getLength() === 0) {
+                    updateAddressStatus('Место не найдено. Попробуйте уточнить запрос', 'error');
+                    return;
+                }
+                
+                const firstFoundObject = foundObjects.get(0);
+                const foundCoords = firstFoundObject.geometry.getCoordinates();
+                const foundAddress = firstFoundObject.getAddressLine();
+                
+                let foundName = firstFoundObject.properties.get('name');
+                if (!foundName || foundName === foundAddress) {
+                    foundName = query;
+                }
+                
+                selectedCoords = foundCoords;
+                selectedAddress = foundAddress;
+                
+                if (!document.getElementById('placeTitle').value) {
+                    document.getElementById('placeTitle').value = foundName;
+                }
+                
+                document.getElementById('placeAddress').value = foundAddress;
+                
+                if (tempMarker) {
+                    tempMarker.geometry.setCoordinates(foundCoords);
                 } else {
-                    alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                    showTempMarker(foundCoords);
                 }
-            })
-            .catch(error => {
-                console.error('Ошибка:', error);
-                alert('Ошибка сети');
+                
+                map.setCenter(foundCoords, 16, {duration: 500});
+                updateAddressStatus('Место найдено!', 'success');
+                
+            }).catch(function(err) {
+                console.log('Ошибка поиска:', err);
+                updateAddressStatus('Ошибка при поиске. Проверьте запрос', 'error');
             });
+        }
+        
+        function showSuggestions(query) {
+            if (!query || query.length < 2) {
+                hideSuggestions();
+                return;
+            }
+            
+            clearTimeout(suggestTimeout);
+            suggestTimeout = setTimeout(() => {
+                ymaps.suggest(query, {
+                    boundedBy: map.getBounds(),
+                    strictBounds: false,
+                    results: 5
+                }).then(function(items) {
+                    const container = document.getElementById('suggestions');
+                    container.innerHTML = '';
+                    
+                    if (items.length === 0) {
+                        hideSuggestions();
+                        return;
+                    }
+                    
+                    items.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        const icon = getSuggestionIcon(item);
+                        div.innerHTML = `
+                            <span class="suggestion-icon">${icon}</span>
+                            <span class="suggestion-text">${item.value}</span>
+                        `;
+                        
+                        div.onclick = function() {
+                            document.getElementById('placeAddress').value = item.value;
+                            hideSuggestions();
+                            geocodeAddress();
+                        };
+                        container.appendChild(div);
+                    });
+                    
+                    container.classList.remove('hidden');
+                });
+            }, 200);
+        }
+        
+        function getSuggestionIcon(item) {
+            const types = item.tags || [];
+            if (types.includes('street')) return '🏠';
+            if (types.includes('metro')) return '🚇';
+            if (types.includes('house')) return '📍';
+            if (types.includes('organization')) return '🏢';
+            if (types.includes('attraction')) return '🏛️';
+            return '🔍';
+        }
+        
+        function hideSuggestions() {
+            document.getElementById('suggestions').classList.add('hidden');
+        }
+        
+        function getAddressFromCoords(coords) {
+            updateAddressStatus('Определяем адрес...', 'loading');
+            
+            ymaps.geocode(coords).then(function(res) {
+                const firstGeoObject = res.geoObjects.get(0);
+                
+                if (firstGeoObject) {
+                    const address = firstGeoObject.getAddressLine();
+                    selectedAddress = address;
+                    document.getElementById('placeAddress').value = address;
+                    updateAddressStatus('Адрес определен', 'success');
+                } else {
+                    selectedAddress = 'Адрес не определен';
+                    document.getElementById('placeAddress').value = 'Адрес не определен';
+                    updateAddressStatus('Адрес не определен', 'warning');
+                }
+            }).catch(function(err) {
+                console.log('Ошибка геокодирования:', err);
+                selectedAddress = 'Адрес не определен';
+                document.getElementById('placeAddress').value = 'Адрес не определен';
+                updateAddressStatus('Ошибка определения адреса', 'error');
+            });
+        }
+        
+        function handleAddressKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                hideSuggestions();
+                geocodeAddress();
+            }
+        }
+        
+        function updateAddressStatus(message, type) {
+            const statusElement = document.getElementById('addressStatus');
+            statusElement.textContent = message;
+            statusElement.className = 'address-status ' + type;
+        }
+        
+        function toggleAddMode() {
+            if (addPlaceListener) {
+                disableAddMode();
+            } else {
+                enableAddMode();
+            }
+        }
+        
+        function enableAddMode() {
+            document.querySelector('.controls .btn-primary').classList.add('active');
+            addPlaceListener = true;
+            updateAddressStatus('Кликните на карте или введите адрес/название', 'info');
+        }
+        
+        function disableAddMode() {
+            document.querySelector('.controls .btn-primary').classList.remove('active');
+            document.getElementById('addPlacePanel').classList.add('hidden');
+            hideSuggestions();
+            
+            if (tempMarker) {
+                map.geoObjects.remove(tempMarker);
+                tempMarker = null;
+            }
+            
+            resetPhotoUploads();
+            
+            document.getElementById('placeTitle').value = '';
+            document.getElementById('placeDescription').value = '';
+            document.getElementById('placeAddress').value = '';
+            updateAddressStatus('', '');
+            
+            addPlaceListener = null;
+            selectedCoords = null;
+            selectedAddress = '';
+        }
+        
+        function resetPhotoUploads() {
+            removeMainPhoto();
+            removeAllSecondaryPhotos();
+        }
+        
+        async function savePlace() {
+            const title = document.getElementById('placeTitle').value.trim();
+            if (!title || !selectedCoords) {
+                showNotification('Заполните название места и выберите точку на карте', 'error');
+                return;
+            }
+            
+            const saveButton = document.getElementById('saveButton');
+            const originalText = saveButton.innerHTML;
+            saveButton.innerHTML = '⏳ Сохранение...';
+            saveButton.disabled = true;
+            
+            try {
+                const address = document.getElementById('placeAddress').value.trim() || selectedAddress;
+                
+                // Создаем FormData для отправки файлов
+                const formData = new FormData();
+                formData.append('telegram_user_id', TELEGRAM_USER_ID);
+                formData.append('title', title);
+                formData.append('description', document.getElementById('placeDescription').value);
+                formData.append('date_visited', document.getElementById('placeDate').value);
+                formData.append('lat', selectedCoords[0]);
+                formData.append('lon', selectedCoords[1]);
+                formData.append('address', address);
+                
+                // Добавляем главное фото
+                if (uploadedPhotos.main) {
+                    formData.append('main_photo', uploadedPhotos.main);
+                }
+                
+                // Добавляем дополнительные фото
+                uploadedPhotos.secondary.forEach((photo, index) => {
+                    formData.append(`secondary_photos`, photo.file);
+                });
+                
+                const response = await fetch('/api/places', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Ошибка сервера');
+                }
+                
+                const result = await response.json();
+                showNotification('Место успешно сохранено!', 'success');
+                
+                // Обновляем карту
+                createPlacemark(result.place);
+                
+                // Закрываем панель добавления
+                disableAddMode();
+                
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
+                showNotification('Ошибка сохранения: ' + error.message, 'error');
+            } finally {
+                saveButton.innerHTML = originalText;
+                saveButton.disabled = false;
+            }
+        }
+        
+        function cancelAddPlace() {
+            disableAddMode();
         }
         
         function shareMap() {
-            const shareUrl = `${window.location.origin}/guest/${USER_ID}`;
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Моя карта "Было дело"',
-                    url: shareUrl
-                });
+            const shareUrl = `${window.location.origin}/guest/${TELEGRAM_USER_ID}`;
+            
+            // Используем Telegram Share функционал
+            if (tg.isVersionAtLeast('6.0')) {
+                tg.shareUrl(shareUrl, 'Моя карта "Было дело"');
             } else {
-                navigator.clipboard.writeText(shareUrl).then(() => {
-                    alert('Ссылка скопирована в буфер обмена!\n\n' + shareUrl);
-                });
+                // Альтернативный способ для старых версий
+                tg.showAlert(`Ссылка для просмотра вашей карты:\n\n${shareUrl}`);
             }
         }
+        
+        // Функция для показа уведомлений
+        function showNotification(message, type = 'info') {
+            if (tg.isVersionAtLeast('6.0')) {
+                tg.showPopup({
+                    title: type === 'error' ? 'Ошибка' : type === 'success' ? 'Успех' : 'Информация',
+                    message: message,
+                    buttons: [{ type: 'ok' }]
+                });
+            } else {
+                tg.showAlert(message);
+            }
+        }
+        {% endif %}
     </script>
 </body>
 </html>
