@@ -110,6 +110,14 @@
             setupAdminFeatures();
             setupPhotoUploads();
             {% endif %}
+            
+            // Обработчик клика вне поля ввода для скрытия подсказок
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.address-input-container') && 
+                    !e.target.closest('.suggestions-container')) {
+                    hideSuggestions();
+                }
+            });
         }
         
         function setupPhotoUploads() {
@@ -218,7 +226,6 @@
             updateSecondaryPhotoPreview();
         }
         
-        // Остальные функции остаются без изменений...
         function loadPlaces() {
             fetch(`/api/places?user_id=${USER_ID}`)
                 .then(response => {
@@ -299,13 +306,20 @@
             updateAddressStatus('Ищем...', 'loading');
             hideSuggestions();
             
-            ymaps.suggest(query).then(function(items) {
-                if (items.length > 0) {
-                    const bestMatch = items[0];
-                    return ymaps.geocode(bestMatch.value);
-                } else {
-                    return ymaps.geocode(query);
+            // Используем прямое геокодирование как в Яндекс Картах
+            ymaps.geocode(query, {
+                results: 1, // Берем только лучший результат
+                boundedBy: map.getBounds(), // Ищем в области видимости карты
+                strictBounds: false
+            }).then(function(res) {
+                const foundObjects = res.geoObjects;
+                
+                if (foundObjects.getLength() === 0) {
+                    // Если не нашли, пробуем поискать без ограничений по области
+                    return ymaps.geocode(query, { results: 1 });
                 }
+                return res;
+                
             }).then(function(res) {
                 const foundObjects = res.geoObjects;
                 
@@ -317,7 +331,13 @@
                 const firstFoundObject = foundObjects.get(0);
                 const foundCoords = firstFoundObject.geometry.getCoordinates();
                 const foundAddress = firstFoundObject.getAddressLine();
-                const foundName = firstFoundObject.properties.get('name') || foundAddress;
+                
+                // Получаем наименование объекта (если есть)
+                let foundName = firstFoundObject.properties.get('name');
+                if (!foundName || foundName === foundAddress) {
+                    // Если имя совпадает с адресом или отсутствует, используем текст запроса
+                    foundName = query;
+                }
                 
                 selectedCoords = foundCoords;
                 selectedAddress = foundAddress;
@@ -334,7 +354,7 @@
                     showTempMarker(foundCoords);
                 }
                 
-                map.setCenter(foundCoords, 15, {duration: 500});
+                map.setCenter(foundCoords, 16, {duration: 500});
                 
                 updateAddressStatus('Место найдено!', 'success');
                 
@@ -352,7 +372,12 @@
             
             clearTimeout(suggestTimeout);
             suggestTimeout = setTimeout(() => {
-                ymaps.suggest(query).then(function(items) {
+                // Используем suggest с параметрами для лучших результатов
+                ymaps.suggest(query, {
+                    boundedBy: map.getBounds(),
+                    strictBounds: false,
+                    results: 5
+                }).then(function(items) {
                     const container = document.getElementById('suggestions');
                     container.innerHTML = '';
                     
@@ -361,10 +386,17 @@
                         return;
                     }
                     
-                    items.slice(0, 5).forEach(item => {
+                    items.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'suggestion-item';
-                        div.textContent = item.value;
+                        
+                        // Добавляем иконку типа места
+                        const icon = getSuggestionIcon(item);
+                        div.innerHTML = `
+                            <span class="suggestion-icon">${icon}</span>
+                            <span class="suggestion-text">${item.value}</span>
+                        `;
+                        
                         div.onclick = function() {
                             document.getElementById('placeAddress').value = item.value;
                             hideSuggestions();
@@ -375,7 +407,18 @@
                     
                     container.classList.remove('hidden');
                 });
-            }, 300);
+            }, 200); // Уменьшил задержку для более быстрого отклика
+        }
+        
+        // Функция для получения иконки типа места
+        function getSuggestionIcon(item) {
+            const types = item.tags || [];
+            if (types.includes('street')) return '🏠';
+            if (types.includes('metro')) return '🚇';
+            if (types.includes('house')) return '📍';
+            if (types.includes('organization')) return '🏢';
+            if (types.includes('attraction')) return '🏛️';
+            return '🔍';
         }
         
         function hideSuggestions() {
@@ -406,10 +449,10 @@
             });
         }
         
-        
         function handleAddressKeypress(event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
+                hideSuggestions();
                 geocodeAddress();
             }
         }
