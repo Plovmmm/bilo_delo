@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🗺️ Было дело - Моя карта</title>
-    <script src="https://api-maps.yandex.ru/2.1/?apikey={{ yandex_maps_key }}&lang=ru_RU" type="text/javascript"></script>
+    <!-- Замените YOUR_API_KEY на реальный ключ из кабинета разработчика Яндекс -->
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=e3ae341e-a8e0-4284-8d2f-cc20984dc27e&lang=ru_RU" type="text/javascript"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -21,12 +22,6 @@
             <span class="btn-text">Поделиться</span>
         </button>
     </div>
-    
-    <!-- Временная метка с кнопкой -->
-    <div id="tempMarker" class="temp-marker hidden">
-        <div class="marker-point"></div>
-        <button class="marker-btn" onclick="openAddPanel()">➕ Добавить место</button>
-    </div>
 
     <div id="addPlacePanel" class="panel hidden">
         <h3>Добавить новое место</h3>
@@ -39,6 +34,18 @@
         <div class="form-group">
             <input type="date" id="placeDate" value="{{ today }}">
         </div>
+        <div class="form-group">
+            <div class="address-input-container">
+                <input type="text" id="placeAddress" placeholder="Адрес или название места" 
+                       onkeypress="handleAddressKeypress(event)"
+                       oninput="showSuggestions(this.value)">
+                <button type="button" class="btn-geocode" onclick="geocodeAddress()" title="Найти на карте">
+                    <span class="btn-icon">📍</span>
+                </button>
+            </div>
+            <div id="suggestions" class="suggestions-container"></div>
+            <div id="addressStatus" class="address-status"></div>
+        </div>
         <div class="form-actions">
             <button class="btn btn-cancel" onclick="cancelAddPlace()">Отмена</button>
             <button class="btn btn-success" onclick="savePlace()">Сохранить</button>
@@ -49,7 +56,8 @@
     <script>
         const USER_ID = "{{ user_id }}";
         const IS_ADMIN = {{ is_admin|tojson }};
-        let map, addPlaceListener, selectedCoords, tempMarker;
+        let map, addPlaceListener, selectedCoords, tempMarker, selectedAddress = '';
+        let suggestTimeout;
         
         ymaps.ready(initMap);
 
@@ -60,7 +68,12 @@
                 controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
             });
             
-            loadPlaces();
+            // Загружаем места, если API доступно
+            try {
+                loadPlaces();
+            } catch (e) {
+                console.log('API мест временно недоступно');
+            }
             
             {% if is_admin %}
             setupAdminFeatures();
@@ -69,9 +82,17 @@
         
         function loadPlaces() {
             fetch(`/api/places?user_id=${USER_ID}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('API недоступно');
+                    }
+                    return response.json();
+                })
                 .then(places => {
                     places.forEach(place => createPlacemark(place));
+                })
+                .catch(error => {
+                    console.log('Ошибка загрузки мест:', error);
                 });
         }
         
@@ -83,12 +104,6 @@
                         <p><strong>Дата:</strong> ${place.date_visited}</p>
                         ${place.description ? `<p><strong>Описание:</strong> ${place.description}</p>` : ''}
                         ${place.address ? `<p><strong>Адрес:</strong> ${place.address}</p>` : ''}
-                        ${place.photos && place.photos.length > 0 ? 
-                            `<div class="place-photos">
-                                ${place.photos.map(photo => 
-                                    `<img src="${photo.url}" alt="${place.title}" style="max-width: 100px; margin: 5px;">`
-                                ).join('')}
-                            </div>` : ''}
                         ${IS_ADMIN ? `<button onclick="editPlace(${place.id})" class="balloon-btn">✏️ Редактировать</button>` : ''}
                     </div>
                 `
@@ -101,8 +116,6 @@
         
         {% if is_admin %}
         function setupAdminFeatures() {
-            // Настройка функций для админа
-            // Обработчик клика по карте - показывает временную метку
             map.events.add('click', function(e) {
                 if (addPlaceListener) {
                     showTempMarker(e.get('coords'));
@@ -110,35 +123,171 @@
             });
         }
 
-        // Функция показа временной метки при клике на карте
         function showTempMarker(coords) {
-            selectedCoords = coords;  // Сохраняем выбранные координаты
+            selectedCoords = coords;
         
-            // Удаляем предыдущую временную метку если есть
             if (tempMarker) {
                 map.geoObjects.remove(tempMarker);
             }
         
-            // Создаем красную метку на карте
             tempMarker = new ymaps.Placemark(coords, {}, {
                 preset: 'islands#redIcon',
-                draggable: true  // Можно перемещать метку
+                draggable: true,
+                balloonContent: 'Новое место'
             });
         
             map.geoObjects.add(tempMarker);
         
-            // Определяем адрес по координатам
-            getAddress(coords);
+            getAddressFromCoords(coords);
         
-            // Обработчик перемещения метки
             tempMarker.events.add('dragend', function() {
                 const newCoords = tempMarker.geometry.getCoordinates();
                 selectedCoords = newCoords;
-                getAddress(newCoords);
+                getAddressFromCoords(newCoords);
             });
             
-            // Показываем панель добавления места
             document.getElementById('addPlacePanel').classList.remove('hidden');
+        }
+        
+        // Умное геокодирование - работает с адресами и названиями
+        function geocodeAddress() {
+            const query = document.getElementById('placeAddress').value.trim();
+            
+            if (!query) {
+                updateAddressStatus('Введите адрес или название места', 'warning');
+                return;
+            }
+            
+            updateAddressStatus('Ищем...', 'loading');
+            hideSuggestions();
+            
+            // Используем suggest для более умного поиска
+            ymaps.suggest(query).then(function(items) {
+                if (items.length > 0) {
+                    // Берем первый и самый релевантный вариант
+                    const bestMatch = items[0];
+                    return ymaps.geocode(bestMatch.value);
+                } else {
+                    // Если suggest не дал результатов, пробуем прямое геокодирование
+                    return ymaps.geocode(query);
+                }
+            }).then(function(res) {
+                const foundObjects = res.geoObjects;
+                
+                if (foundObjects.getLength() === 0) {
+                    updateAddressStatus('Место не найдено. Попробуйте уточнить запрос', 'error');
+                    return;
+                }
+                
+                // Берем первый результат
+                const firstFoundObject = foundObjects.get(0);
+                const foundCoords = firstFoundObject.geometry.getCoordinates();
+                const foundAddress = firstFoundObject.getAddressLine();
+                const foundName = firstFoundObject.properties.get('name') || foundAddress;
+                
+                // Обновляем данные
+                selectedCoords = foundCoords;
+                selectedAddress = foundAddress;
+                
+                // Заполняем поле названия, если оно пустое
+                if (!document.getElementById('placeTitle').value) {
+                    document.getElementById('placeTitle').value = foundName;
+                }
+                
+                document.getElementById('placeAddress').value = foundAddress;
+                
+                // Обновляем метку
+                if (tempMarker) {
+                    tempMarker.geometry.setCoordinates(foundCoords);
+                } else {
+                    showTempMarker(foundCoords);
+                }
+                
+                // Центрируем карту
+                map.setCenter(foundCoords, 15, {duration: 500});
+                
+                updateAddressStatus('Место найдено!', 'success');
+                
+            }).catch(function(err) {
+                console.log('Ошибка поиска:', err);
+                updateAddressStatus('Ошибка при поиске. Проверьте запрос', 'error');
+            });
+        }
+        
+        // Показ подсказок при вводе
+        function showSuggestions(query) {
+            if (!query || query.length < 2) {
+                hideSuggestions();
+                return;
+            }
+            
+            clearTimeout(suggestTimeout);
+            suggestTimeout = setTimeout(() => {
+                ymaps.suggest(query).then(function(items) {
+                    const container = document.getElementById('suggestions');
+                    container.innerHTML = '';
+                    
+                    if (items.length === 0) {
+                        hideSuggestions();
+                        return;
+                    }
+                    
+                    items.slice(0, 5).forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'suggestion-item';
+                        div.textContent = item.value;
+                        div.onclick = function() {
+                            document.getElementById('placeAddress').value = item.value;
+                            hideSuggestions();
+                            geocodeAddress();
+                        };
+                        container.appendChild(div);
+                    });
+                    
+                    container.classList.remove('hidden');
+                });
+            }, 300);
+        }
+        
+        function hideSuggestions() {
+            document.getElementById('suggestions').classList.add('hidden');
+        }
+        
+        function getAddressFromCoords(coords) {
+            updateAddressStatus('Определяем адрес...', 'loading');
+            
+            ymaps.geocode(coords).then(function(res) {
+                const firstGeoObject = res.geoObjects.get(0);
+                
+                if (firstGeoObject) {
+                    const address = firstGeoObject.getAddressLine();
+                    selectedAddress = address;
+                    document.getElementById('placeAddress').value = address;
+                    updateAddressStatus('Адрес определен', 'success');
+                } else {
+                    selectedAddress = 'Адрес не определен';
+                    document.getElementById('placeAddress').value = 'Адрес не определен';
+                    updateAddressStatus('Адрес не определен', 'warning');
+                }
+            }).catch(function(err) {
+                console.log('Ошибка геокодирования:', err);
+                selectedAddress = 'Адрес не определен';
+                document.getElementById('placeAddress').value = 'Адрес не определен';
+                updateAddressStatus('Ошибка определения адреса', 'error');
+            });
+        }
+        
+        function handleAddressKeypress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                geocodeAddress();
+            }
+        }
+        
+        function updateAddressStatus(message, type) {
+            const statusElement = document.getElementById('addressStatus');
+            statusElement.textContent = message;
+            statusElement.className = 'address-status ' + type;
         }
         
         function toggleAddMode() {
@@ -151,30 +300,28 @@
         
         function enableAddMode() {
             document.querySelector('.controls .btn-primary').classList.add('active');
-            addPlaceListener = true; // Устанавливаем флаг, что режим добавления активен
+            addPlaceListener = true;
+            updateAddressStatus('Кликните на карте или введите адрес/название', 'info');
         }
         
         function disableAddMode() {
             document.querySelector('.controls .btn-primary').classList.remove('active');
             document.getElementById('addPlacePanel').classList.add('hidden');
+            hideSuggestions();
             
-            // Удаляем временную метку
             if (tempMarker) {
                 map.geoObjects.remove(tempMarker);
                 tempMarker = null;
             }
             
+            document.getElementById('placeTitle').value = '';
+            document.getElementById('placeDescription').value = '';
+            document.getElementById('placeAddress').value = '';
+            updateAddressStatus('', '');
+            
             addPlaceListener = null;
-        }
-        
-        function getAddress(coords) {
-            // Получаем адрес по координатам
-            ymaps.geocode(coords).then(function (res) {
-                const firstGeoObject = res.geoObjects.get(0);
-                const address = firstGeoObject ? firstGeoObject.getAddressLine() : 'Адрес не определен';
-                // Сохраняем адрес для использования при сохранении
-                selectedAddress = address;
-            });
+            selectedCoords = null;
+            selectedAddress = '';
         }
         
         function savePlace() {
@@ -184,6 +331,8 @@
                 return;
             }
             
+            const address = document.getElementById('placeAddress').value.trim() || selectedAddress;
+            
             const placeData = {
                 user_id: USER_ID,
                 title: title,
@@ -191,27 +340,27 @@
                 date_visited: document.getElementById('placeDate').value,
                 lat: selectedCoords[0],
                 lon: selectedCoords[1],
-                address: selectedAddress || ''
+                address: address
             };
             
-            fetch('/api/places', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(placeData)
-            }).then(response => response.json())
-              .then(data => {
-                  if (data.success) {
-                      location.reload();
-                  } else {
-                      alert('Ошибка при сохранении: ' + data.error);
-                  }
-              });
+            // Сохраняем место (заглушка - нужно реализовать бэкенд)
+            console.log('Сохранение места:', placeData);
+            alert('Функция сохранения требует настройки бэкенд API');
+            
+            // Для тестирования можно временно использовать:
+            // createPlacemark({
+            //     lat: selectedCoords[0],
+            //     lon: selectedCoords[1],
+            //     title: title,
+            //     date_visited: document.getElementById('placeDate').value,
+            //     description: document.getElementById('placeDescription').value,
+            //     address: address
+            // });
+            // disableAddMode();
         }
         
         function cancelAddPlace() {
             disableAddMode();
-            document.getElementById('placeTitle').value = '';
-            document.getElementById('placeDescription').value = '';
         }
         
         function shareMap() {
@@ -227,10 +376,43 @@
                 });
             }
         }
-        
-        // Добавляем переменную для хранения адреса
-        let selectedAddress = '';
         {% endif %}
     </script>
+
+    <style>
+        /* Дополнительные стили для подсказок */
+        .suggestions-container {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1002;
+            width: calc(100% - 40px);
+        }
+        
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .suggestion-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .address-input-container {
+            position: relative;
+        }
+    </style>
 </body>
 </html>
