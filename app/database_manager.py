@@ -1,5 +1,5 @@
-import psycopg2
-from psycopg2 import pool
+import psycopg2 # type: ignore
+from psycopg2 import pool # type: ignore
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -90,7 +90,7 @@ class DatabaseManager:
                     CREATE TABLE IF NOT EXISTS marks (
                         id SERIAL PRIMARY KEY,
                         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                        name VARCHAR(200) NOT NULL,
+                        title VARCHAR(200) NOT NULL,
                         description TEXT,
                         visit_date DATE NOT NULL,
                         address TEXT,
@@ -112,12 +112,7 @@ class DatabaseManager:
                         mark_id INTEGER NOT NULL REFERENCES marks(id) ON DELETE CASCADE,
                         filename VARCHAR(255) NOT NULL,
                         is_main BOOLEAN DEFAULT FALSE,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        
-                        -- Ограничение: только одно главное фото на место
-                        CONSTRAINT one_main_photo_per_mark 
-                            UNIQUE (mark_id, is_main) 
-                            DEFERRABLE INITIALLY DEFERRED
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
                 
@@ -169,7 +164,7 @@ class DatabaseManager:
         result = self._execute_query(query, (telegram_id,))
         if result:
             return {
-                "id": result[0][0]
+                "id": result[0]
             }
         return None
     
@@ -190,25 +185,25 @@ class DatabaseManager:
         return None
     
     # DAO МЕТОДЫ ДЛЯ МЕТОК
-    def create_mark(self, user_id, name, coords, visit_date=None, description=None, address=None):
+    def create_mark(self, user_id, title, coords, visit_date=None, description=None, address=None):
         """Создание новой метки"""
         query = """
         INSERT INTO marks 
-        (user_id, name, description, visit_date, address, lat, y) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        (user_id, title, description, visit_date, address, lat, lon) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING id;
         """
-        result = self._execute_query(query, (user_id, name, description, visit_date, address, coords[0], coords[1]))
+        result = self._execute_query(query, (user_id, title, description, visit_date, address, coords[0], coords[1]))
         if result:
             return {
-                "id": result[0][0]
+                "id": result[0]
             }
         return None
     
     def get_user_marks(self, user_id):
         """Получение всех меток пользователя"""
         query = """
-        SELECT id, user_id, name, description, visit_date, address, lat, lon, created_at
+        SELECT id, user_id, title, description, visit_date, address, lat, lon, created_at
         FROM marks 
         WHERE user_id = %s
         ORDER BY visit_date DESC, created_at DESC;
@@ -220,12 +215,12 @@ class DatabaseManager:
                 marks.append({
                     "id": mark[0],
                     "user_id": mark[1],
-                    "name": mark[2],
+                    "title": mark[2],
                     "description": mark[3],
                     "visit_date": mark[4],
                     "address": mark[5],
-                    "x": mark[6],
-                    "y": mark[7],
+                    "lat": mark[6],
+                    "lon": mark[7],
                     "created_at": mark[8]
                 })
             return marks
@@ -245,8 +240,8 @@ class DatabaseManager:
             for mark in result:
                 marks.append({
                     "id": mark[0],
-                    "x": mark[1],
-                    "y": mark[2],
+                    "lat": mark[1],
+                    "lon": mark[2],
                     "user_id": mark[3]
                 })
             return marks
@@ -256,7 +251,7 @@ class DatabaseManager:
     def get_mark_by_id(self, mark_id):
         """Получение метки по ID"""
         query = """
-        SELECT id, user_id, name, description, visit_date, address, lat, lon, created_at
+        SELECT id, user_id, title, description, visit_date, address, lat, lon, created_at
         FROM marks 
         WHERE id = %s;
         """
@@ -265,12 +260,12 @@ class DatabaseManager:
             return {
                 "id": result[0][0],
                 "user_id": result[0][1],
-                "name": result[0][2],
+                "title": result[0][2],
                 "description": result[0][3],
                 "visit_date": result[0][4],
                 "address": result[0][5],
-                "x": result[0][6],
-                "y": result[0][7],
+                "lan": result[0][6],
+                "log": result[0][7],
                 "created_at": result[0][8]
             }
         return None
@@ -306,7 +301,14 @@ class DatabaseManager:
         RETURNING id, mark_id, filename, is_main, created_at;
         """
         result = self._execute_query(query, (mark_id, filename, is_main))
-        return result[0] if result else None
+        if result:
+            return {
+                'id': result[0],
+                'mark_id': result[1],
+                'filename': result[2],
+                'is_main': result[3],
+            }
+        return None
     
     def get_mark_photos_filename(self, mark_id):
         """Получение всех фотографий метки"""

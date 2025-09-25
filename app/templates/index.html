@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🗺️ Было дело - Моя карта</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://api-maps.yandex.ru/2.1/?apikey=e3ae341e-a8e0-4284-8d2f-cc20984dc27e&lang=ru_RU" type="text/javascript"></script>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey={{ yandex_maps_key }}&lang=ru_RU" type="text/javascript"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -81,6 +81,56 @@
     </div>
     {% endif %}
 
+    <!-- Панель просмотра метки -->
+    <div id="viewMarkPanel" class="panel hidden">
+        <div class="panel-header">
+            <h3>Информация о месте</h3>
+            <button class="btn-close" onclick="closeViewMarkPanel()">×</button>
+        </div>
+        
+        <div class="mark-details">
+            <!-- Главное фото -->
+            <div class="main-photo-section" id="mainPhotoSection">
+                <img id="viewMainPhoto" src="" alt="Главное фото" class="main-photo">
+            </div>
+            
+            <!-- Дополнительные фото -->
+            <div class="secondary-photos-section" id="secondaryPhotosSection">
+                <h4>Дополнительные фото</h4>
+                <div class="photos-grid" id="secondaryPhotosGrid">
+                    <!-- Фото будут добавлены через JS -->
+                </div>
+            </div>
+            
+            <!-- Информация о месте -->
+            <div class="mark-info">
+                <div class="info-group">
+                    <label>Название:</label>
+                    <div id="viewMarkTitle" class="info-value"></div>
+                </div>
+                
+                <div class="info-group">
+                    <label>Дата посещения:</label>
+                    <div id="viewMarkDate" class="info-value"></div>
+                </div>
+                
+                <div class="info-group">
+                    <label>Адрес:</label>
+                    <div id="viewMarkAddress" class="info-value"></div>
+                </div>
+                
+                <div class="info-group">
+                    <label>Описание:</label>
+                    <div id="viewMarkDescription" class="info-value"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button class="btn btn-secondary" onclick="closeViewMarkPanel()">Закрыть</button>
+        </div>
+    </div>
+
     <script>
         // Инициализация Telegram Web App
         let tg = window.Telegram.WebApp;
@@ -97,13 +147,14 @@
             secondary: []
         };
         const MAX_SECONDARY_PHOTOS = 3;
+        let currentMarkId = null;
         
         ymaps.ready(initMap);
 
         function initMap() {
             map = new ymaps.Map("map", {
-                center: [55.76, 37.64],
-                zoom: 10,
+                center: [59.93, 30.30],
+                zoom: 12,
                 controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
             });
             
@@ -224,40 +275,153 @@
         }
         
         function loadPlaces() {
-            fetch(`/api/places?telegram_user_id=${TELEGRAM_USER_ID}`)
+            fetch(`api/get_marks/${TELEGRAM_USER_ID}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('API недоступно');
                     }
                     return response.json();
                 })
-                .then(places => {
-                    places.forEach(place => createPlacemark(place));
+                .then(response => {
+                    if (response.success && response.marks) {
+                        response.marks.forEach(place => createPlacemark(place));
+                    }
                 })
                 .catch(error => {
-                    console.log('Ошибка загрузки мест:', error);
-                    showNotification('Ошибка загрузки мест', 'error');
+                    console.error('Ошибка загрузки мест:', error);
                 });
         }
         
         function createPlacemark(place) {
-            const placemark = new ymaps.Placemark([place.lat, place.lon], {
+            // Используем правильные названия полей координат
+            const coords = place.coords
+            
+            const placemark = new ymaps.Placemark(coords, {
                 balloonContentHeader: place.title,
                 balloonContentBody: `
                     <div class="balloon-content">
-                        <p><strong>Дата:</strong> ${place.date_visited}</p>
-                        ${place.description ? `<p><strong>Описание:</strong> ${place.description}</p>` : ''}
+                        <p><strong>Дата:</strong> ${place.visit_date}</p>
                         ${place.address ? `<p><strong>Адрес:</strong> ${place.address}</p>` : ''}
-                        ${place.photos && place.photos.main ? `<div class="photo-thumbnail"><img src="/api/photos/${place.photos.main}" alt="Фото"></div>` : ''}
-                        ${IS_ADMIN ? `<button onclick="editPlace(${place.id})" class="balloon-btn">✏️ Редактировать</button>` : ''}
+                        <button onclick="viewMarkDetails(${place.id})" class="balloon-btn">
+                            📖 Подробнее
+                        </button>
                     </div>
                 `
             }, {
-                preset: 'islands#blueIcon'
+                preset: 'islands#blueIcon',
+                balloonCloseButton: true
             });
-            
+
+            // Обработчик клика на метку
+            placemark.events.add('click', function(e) {
+                e.preventDefault();
+                viewMarkDetails(place.id);
+            });
+
             map.geoObjects.add(placemark);
+            return placemark;
         }
+        
+        // Функция загрузки и отображения информации о метке
+        async function viewMarkDetails(markId) {
+            try {
+                const response = await fetch(`/api/get_mark/${markId}`);
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки данных');
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMarkInfo(result.mark);
+                    currentMarkId = markId;
+                } else {
+                    alert('Не удалось загрузить информацию о месте');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка загрузки информации');
+            }
+        }
+
+        // Функция отображения информации о метке
+        function showMarkInfo(mark) {
+            // Заполняем текстовые данные
+            document.getElementById('viewMarkTitle').textContent = mark.title || 'Не указано';
+            document.getElementById('viewMarkDate').textContent = mark.visit_date || 'Не указана';
+            document.getElementById('viewMarkAddress').textContent = mark.address || 'Адрес не указан';
+            document.getElementById('viewMarkDescription').textContent = mark.description || 'Описание отсутствует';
+            
+            // Обрабатываем главное фото
+            const mainPhotoSection = document.getElementById('mainPhotoSection');
+            const mainPhoto = document.getElementById('viewMainPhoto');
+            
+            if (mark.main_photo) {
+                mainPhoto.src = mark.main_photo;
+                mainPhoto.style.display = 'block';
+                mainPhoto.onclick = () => openPhotoModal(mark.main_photo);
+                mainPhotoSection.style.display = 'block';
+            } else {
+                mainPhotoSection.style.display = 'none';
+            }
+            
+            // Обрабатываем дополнительные фото
+            const secondarySection = document.getElementById('secondaryPhotosSection');
+            const photosGrid = document.getElementById('secondaryPhotosGrid');
+            photosGrid.innerHTML = '';
+            
+            if (mark.photos && mark.photos.length > 0) {
+                mark.photos.forEach((photo, index) => {
+                    const img = document.createElement('img');
+                    img.src = photo;
+                    img.className = 'photo-thumb';
+                    img.alt = `Фото места ${index + 1}`;
+                    img.onclick = () => openPhotoModal(photo);
+                    photosGrid.appendChild(img);
+                });
+                secondarySection.style.display = 'block';
+            } else {
+                secondarySection.style.display = 'none';
+            }
+            
+            // Показываем панель
+            document.getElementById('viewMarkPanel').classList.remove('hidden');
+        }
+
+        // Функция закрытия панели
+        function closeViewMarkPanel() {
+            document.getElementById('viewMarkPanel').classList.add('hidden');
+            currentMarkId = null;
+        }
+
+        // Функция открытия фото в модальном окне
+        function openPhotoModal(photoData) {
+            const modal = document.createElement('div');
+            modal.className = 'photo-modal';
+            modal.innerHTML = `
+                <div class="photo-modal-content">
+                    <span class="photo-modal-close" onclick="this.parentElement.parentElement.remove()">×</span>
+                    <img src="${photoData}" alt="Фото места">
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Закрытие по клику на фон
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+        }
+
+        // Обработчик Escape для закрытия панели
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeViewMarkPanel();
+            }
+        });
         
         {% if is_admin %}
         function setupAdminFeatures() {
@@ -510,10 +674,10 @@
                 
                 // Создаем FormData для отправки файлов
                 const formData = new FormData();
-                formData.append('telegram_user_id', TELEGRAM_USER_ID);
+                formData.append('user_telegram_id', TELEGRAM_USER_ID);
                 formData.append('title', title);
                 formData.append('description', document.getElementById('placeDescription').value);
-                formData.append('date_visited', document.getElementById('placeDate').value);
+                formData.append('visit_date', document.getElementById('placeDate').value);
                 formData.append('lat', selectedCoords[0]);
                 formData.append('lon', selectedCoords[1]);
                 formData.append('address', address);
@@ -528,7 +692,7 @@
                     formData.append(`secondary_photos`, photo.file);
                 });
                 
-                const response = await fetch('/api/places', {
+                const response = await fetch(`api/create_mark`, {
                     method: 'POST',
                     body: formData
                 });
@@ -542,7 +706,7 @@
                 showNotification('Место успешно сохранено!', 'success');
                 
                 // Обновляем карту
-                createPlacemark(result.place);
+                createPlacemark(result.mark);
                 
                 // Закрываем панель добавления
                 disableAddMode();
@@ -574,15 +738,7 @@
         
         // Функция для показа уведомлений
         function showNotification(message, type = 'info') {
-            if (tg.isVersionAtLeast('6.0')) {
-                tg.showPopup({
-                    title: type === 'error' ? 'Ошибка' : type === 'success' ? 'Успех' : 'Информация',
-                    message: message,
-                    buttons: [{ type: 'ok' }]
-                });
-            } else {
-                tg.showAlert(message);
-            }
+            alert(message); // Временная замена для теста
         }
         {% endif %}
     </script>

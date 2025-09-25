@@ -3,7 +3,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
 from dotenv import load_dotenv
-from web_app import startFlask
+from web_app import WebApplication
+import threading
 
 # Настройка логирования
 # logging.basicConfig(
@@ -53,7 +54,9 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     """Основная функция"""
     # Запускаем Flask в отдельном потоке
-    startFlask(daemon=True)
+    app = WebApplication()
+    flask_thread = threading.Thread(target=app.run_flask, daemon=True)
+    flask_thread.start()
     
     # Создаем приложение бота
     application = Application.builder().token(BOT_TOKEN).build()
