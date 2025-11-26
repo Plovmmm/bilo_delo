@@ -30,7 +30,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_html(
-        "Привет! Это демо Mini App.\n\n"
+        "Это твоё личное приложение супер карта АУЕ!!!\n"
         "Нажми кнопку ниже чтобы открыть приложение:",
         reply_markup=reply_markup
     )

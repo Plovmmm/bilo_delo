@@ -351,6 +351,26 @@ class DatabaseManager:
         # Затем устанавливаем новое главное фото
         query = "UPDATE photos SET is_main = TRUE WHERE id = %s AND mark_id = %s;"
         return self._execute_query(query, (photo_id, mark_id))
+    
+    def get_main_photo(self, mark_id):
+        """Получение главной фотографии"""
+        query = "SELECT FROM photos WHERE mark_id = %s AND is_main = True;"
+        return self._execute_query(query, (mark_id,))
+    
+    def get_photos(self, mark_id):
+        """Получение главной фотографии"""
+        query = "SELECT FROM photos WHERE mark_id = %s AND is_main = False;"
+        return self._execute_query(query, (mark_id,))
+    
+    def delete_main_photo_by_mark_id(self, mark_id):
+        """Удаление главной фотографии"""
+        query = "DELETE FROM photos WHERE mark_id = %s AND is_main = True;"
+        return self._execute_query(query, (mark_id,))
+    
+    def delete_photos_by_mark_id(self, mark_id):
+        """Удаление дополнительных фотографии"""
+        query = "DELETE FROM photos WHERE mark_id = %s AND is_main = False;"
+        return self._execute_query(query, (mark_id,))
 
     # УТИЛИТНЫЕ МЕТОДЫ
     def get_user_with_marks_coords(self, telegram_id):

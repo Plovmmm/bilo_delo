@@ -41,6 +41,22 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-primary {
     background: #007AFF;
     color: white;
@@ -48,7 +64,6 @@ body {
 
 .btn-primary:hover {
     background: #0056CC;
-    transform: translateY(-2px);
 }
 
 .btn-primary.active {
@@ -62,7 +77,6 @@ body {
 
 .btn-secondary:hover {
     background: #30A14E;
-    transform: translateY(-2px);
 }
 
 .btn-cancel {
@@ -73,6 +87,32 @@ body {
 .btn-success {
     background: #34C759;
     color: white;
+}
+
+.btn-danger {
+    background: #FF3B30;
+    color: white;
+}
+
+.btn-warning {
+    background: #FF9500;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #D70015;
+}
+
+.btn-warning:hover {
+    background: #E68500;
+}
+
+.btn-danger:active {
+    background: #B30012;
+}
+
+.btn-warning:active {
+    background: #CC7700;
 }
 
 /* Панель добавления места */
@@ -253,13 +293,22 @@ body {
     color: white;
     cursor: pointer;
     font-size: 14px;
-    display: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
-.photo-preview.has-photo:hover .btn-remove-photo,
+.photo-preview.has-photo .btn-remove-photo,
+.photo-preview.has-photos .btn-remove-photo {
+    display: flex !important;
+}
+
+/* .photo-preview.has-photo:hover .btn-remove-photo,
 .photo-preview.has-photos:hover .btn-remove-photo {
     display: block;
-}
+} */
 
 .photo-preview.has-photos .btn-remove-photo {
     background: #ff6b6b;
@@ -273,7 +322,7 @@ body {
     position: relative;
 }
 
-#placeAddress {
+#placeAddress, #editPlaceAddress {
     flex: 1;
     padding: 10px;
     border: 1px solid #C6C6C8;
